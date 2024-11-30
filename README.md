@@ -31,7 +31,7 @@ and stop it with
 docker compose down
 ```
 
-The server will be attached to the ports you specified in the .env files.
+The server will be attached to the port 8001.
 Use Virtualhosts (Apache) or Server Blocks (Nginx) with reverse proxy to expose these to the outside. [This guide](https://gist.github.com/adriansteffan/48c9bda7237a8a7fcc5bb6987c8e1790) explains how to do this for our setup.
 
 ### Updating
@@ -65,38 +65,3 @@ in the root directory.
 
 By default, open [http://localhost:5173](http://localhost:5173) to view it in the browser.
 The page will reload if you make edits.
-
-#### Buidling the frontend locally (to test)
-
-
-From the `frontend` directory, run
-
-```
-npm run build
-```
-
-the resulting output can be found in `frontend/dist/`
-
-
-### Backend
-
-#### Installing
-
-Run 
-
-```
-npm install
-```
-
-in the `backend` directory to install all needed dependencies.
-
-
-#### Running the backend
-
-
-TODO
-
-
-## Authors
-
-* **Adrian Steffan** - [adriansteffan](https://github.com/adriansteffan)
