@@ -1,6 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useCallback, useEffect, useState } from 'react';
-import { Experiment, BaseComponentProps, ExperimentConfig, shuffle, now } from 'reactive-psych';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  Experiment,
+  BaseComponentProps,
+  ExperimentConfig,
+  shuffle,
+  now,
+  FileUpload,
+  getParam,
+} from 'reactive-psych';
 
 interface CSVRow {
   stimulus: number;
@@ -12,8 +20,6 @@ interface CSVRow {
 }
 
 type TrialType = 'rank' | 'consec';
-
-const getParams = () => Object.fromEntries(new URLSearchParams(window.location.search));
 
 function parseCSV(csvString: string): CSVRow[] {
   const lines: string[] = csvString.trim().split('\n');
@@ -51,6 +57,8 @@ interface Option {
   eyewitness1: number;
   eyewitness2: number;
 }
+
+type OptionData = Option & { picked: { num: number; time: number }[] };
 
 interface GroupedStimulus {
   category: string;
@@ -107,7 +115,7 @@ const loadAllStimuli = async () => {
 
 const stimuli = shuffle(
   (await loadAllStimuli())
-    .slice(0, Number(getParams()['nitems']) || undefined)
+    .slice(0, getParam('nitems', undefined, 'number'))
     .map((stimulus) => [
       { ...stimulus, type: 'rank' },
       { ...stimulus, type: 'consec' },
@@ -138,8 +146,17 @@ const EyewitnessBlock = ({
   return (
     <EyewitnessTable
       key={stimulusCounter}
-      next={(data) => {
-        setData([{}]);
+      next={(newData) => {
+        console.log(newData);
+        setData([
+          ...data,
+          {
+            version: stimulus.type,
+            category: stimulus.category,
+            stimulusIdWithinCategory: stimulus.stimulusIDwithinCategory,
+            option: newData,
+          },
+        ]);
         setStimulusCounter(stimulusCounter + 1);
       }}
       confirmNeeded={false}
@@ -161,8 +178,8 @@ const EyewitnessTable = ({
 } & BaseComponentProps) => {
   const [selectedRow, setSelectedRow] = useState<number | null>(null);
   const [isPauseScreen, setIsPauseScreen] = useState<boolean>(true);
-  const [startedTimestamp, setStartedTimestamp] = useState(now());
-  const [data, setData] = useState<(Option & { picked: { num: number; time: number }[] })[]>(
+  const startedTimestampRef = useRef(now());
+  const [data, setData] = useState<OptionData[]>(
     stimulus.map((s: Option) => ({ ...s, picked: [] })),
   );
   const [nSelection, setNSelection] = useState(1);
@@ -171,24 +188,40 @@ const EyewitnessTable = ({
     if (nSelection > data.length) {
       next(data);
     }
-  }, [nSelection, data]);
+  }, [nSelection, data, next]);
 
   useEffect(() => {
-    setStartedTimestamp(now());
+    startedTimestampRef.current = now();
   }, [isPauseScreen]);
 
   const handleChoice = useCallback(
     (index: number) => {
-      const newData = [...data];
+      const duration = now() - startedTimestampRef.current;
+      setData((prevData) => {
+        return prevData.map((item, i) =>
+          i === index
+            ? {
+                ...item,
+                picked: [
+                  ...item.picked,
+                  {
+                    num: nSelection,
+                    time: duration,
+                  },
+                ],
+              }
+            : item,
+        );
+      });
+
+      setNSelection((prev) => prev + 1);
+
       if (version === 'rank' && nSelection + 1 <= data.length) {
         setIsPauseScreen(true);
       }
-
-      newData[index].picked.push({ num: nSelection, time: now() - startedTimestamp });
-      setData(newData);
-      setNSelection(nSelection + 1);
+      startedTimestampRef.current = now();
     },
-    [nSelection, data, setData, setNSelection],
+    [nSelection, data.length, version],
   );
 
   return (
@@ -303,6 +336,68 @@ const EyewitnessTable = ({
   );
 };
 
+interface Trial {
+  category: string;
+  version: string;
+  stimulusIdWithinCategory: number;
+  option: OptionData[];
+}
+
+interface ProcessedRow {
+  stimulusidwithincategory: number;
+  category: string;
+  option: number;
+  eyewitness1: number;
+  eyewitness2: number;
+  pickedAsNr1: boolean;
+  pickedAsNr2: boolean;
+  pickedAsNr3: boolean;
+  pickedAsNr4: boolean;
+  timePickedNr1: number | undefined;
+  timePickedNr2: number | undefined;
+  timePickedNr3: number | undefined;
+  timePickedNr4: number | undefined;
+}
+
+const processJsonToCSVs = (sessionID: number, data: any[]): FileUpload[] => {
+  const eyewitnessBlock = data.find((item) => item.type === 'EyewitnessBlock');
+  const trials: Trial[] = eyewitnessBlock?.data || [];
+
+  const rows: ProcessedRow[] = trials.flatMap((trial) =>
+    trial.option.map((opt) => ({
+      version: trial.version,
+      category: trial.category,
+      stimulusidwithincategory: trial.stimulusIdWithinCategory,
+      option: opt.option,
+      eyewitness1: opt.eyewitness1,
+      eyewitness2: opt.eyewitness2,
+      pickedAsNr1: !!opt.picked.find((p) => p.num == 1),
+      pickedAsNr2: !!opt.picked.find((p) => p.num == 2),
+      pickedAsNr3: !!opt.picked.find((p) => p.num == 3),
+      pickedAsNr4: !!opt.picked.find((p) => p.num == 4),
+      timePickedNr1: opt.picked.find((p) => p.num == 1)?.time,
+      timePickedNr2: opt.picked.find((p) => p.num == 2)?.time,
+      timePickedNr3: opt.picked.find((p) => p.num == 3)?.time,
+      timePickedNr4: opt.picked.find((p) => p.num == 4)?.time,
+    })),
+  );
+
+  const headers = Object.keys(rows[0]).join(',');
+  const csvRows = rows.map((row) =>
+    Object.values(row)
+      .map((value) => (value === null ? '' : value))
+      .join(','),
+  );
+
+  return [
+    {
+      filename: `${sessionID}_trialdata.csv`,
+      encoding: 'utf8',
+      content: [headers, ...csvRows].join('\n'),
+    },
+  ];
+};
+
 const experiment = [
   {
     name: 'introtext',
@@ -328,33 +423,33 @@ const experiment = [
       ),
     },
   },
-  // {
-  //   name: `survey`,
-  //   type: 'Quest',
-  //   props: {
-  //     surveyJson: {
-  //       pages: [
-  //         {
-  //           elements: [
-  //             {
-  //               type: 'rating',
-  //               name: 'sad',
-  //               title:
-  //                 'This is where demographic questions could be. How sad are you that hey are missing?',
-  //               isRequired: true,
-  //               rateMin: 1,
-  //               rateMax: 6,
-  //               minRateDescription: 'Not at all',
-  //               maxRateDescription: 'Extremely',
-  //             },
-  //           ],
-  //         },
-  //       ],
-  //     },
-  //   },
-  // },
   {
-    name: 'customtrial',
+    name: `survey`,
+    type: 'Quest',
+    props: {
+      surveyJson: {
+        pages: [
+          {
+            elements: [
+              {
+                type: 'rating',
+                name: 'sad',
+                title:
+                  'Demographic questions could be here. How sad are you that they are missing?',
+                isRequired: true,
+                rateMin: 1,
+                rateMax: 6,
+                minRateDescription: 'Not at all',
+                maxRateDescription: 'Extremely',
+              },
+            ],
+          },
+        ],
+      },
+    },
+  },
+  {
+    name: 'eyewitnesstrial',
     type: 'EyewitnessBlock',
     props: {
       stimuli: stimuli,
@@ -363,6 +458,9 @@ const experiment = [
   {
     name: 'upload',
     type: 'Upload',
+    props: {
+      generateFiles: processJsonToCSVs,
+    },
   },
   {
     name: 'finaltext',
