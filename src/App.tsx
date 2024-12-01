@@ -147,7 +147,6 @@ const EyewitnessBlock = ({
     <EyewitnessTable
       key={stimulusCounter}
       next={(newData) => {
-        console.log(newData);
         setData([
           ...data,
           {
