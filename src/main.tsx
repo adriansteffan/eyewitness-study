@@ -1,9 +1,9 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.tsx";
-import "reactive-psych/style.css";
+import "@adriansteffan/reactive/style.css";
 import "./index.css";
-import { ExperimentProvider } from "reactive-psych";
+import { ExperimentProvider } from "@adriansteffan/reactive";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

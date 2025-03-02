@@ -8,7 +8,7 @@ import {
   now,
   FileUpload,
   getParam,
-} from 'reactive-psych';
+} from '@adriansteffan/reactive';
 
 interface CSVRow {
   stimulus: number;
@@ -225,7 +225,7 @@ const EyewitnessTable = ({
 
   return (
     <div
-      className='min-h-screen border-black max-w-xl m-auto w-full flex'
+      className='min-h-screen border-black max-w-xl m-auto w-full flex select-none'
       onClick={() => {
         if (isPauseScreen) setIsPauseScreen(false);
       }}
@@ -293,12 +293,12 @@ const EyewitnessTable = ({
                     </td>
                     <td className='p-4 border-r-4 border-b-4 border-black font-mono text-xl'>
                       {(row.picked.length == 0 || version === 'rank') && (
-                        <>{row.eyewitness1.toFixed(3)}</>
+                        <>{row.eyewitness1.toFixed(2)}</>
                       )}
                     </td>
                     <td className='p-4 border-b-4 border-black font-mono text-xl'>
                       {(row.picked.length == 0 || version === 'rank') && (
-                        <>{row.eyewitness2.toFixed(3)}</>
+                        <>{row.eyewitness2.toFixed(2)}</>
                       )}
                     </td>
                   </tr>
@@ -399,6 +399,173 @@ const processJsonToCSVs = (sessionID: number, data: any[]): FileUpload[] => {
 
 const experiment = [
   {
+    name: 'consenttext',
+    type: 'Text',
+    props: {
+      buttonText: 'Accept',
+      animate: true,
+
+      content: (
+        <div>
+          <h1>Participant Information</h1>
+          <p>
+            Thank you for your interest in our research project. Enclosed you will find information
+            about the research project, the conditions of participation and the handling of the
+            collected data. Please read everything carefully. If you agree and want to participate
+            in the experiment, please confirm by giving your consent below.
+          </p>
+          <p>
+            <strong>General information about the research project:</strong> <br />
+            This study investigates how people make decisions in a multi-attribute situation. The
+            study takes about 30 minutes in total and includes tasks in which you are asked to
+            estimate the likelihood of fictive subjects having committed fictive crimes, based on
+            fictive eye-witness statements. No special stress or harm is expected as a result of
+            participating in this research project. Participation in the study is remunerated at 10€
+            per hour, rounded up to the nearest minute. Even if you decide to withdraw from the
+            study, you are still entitled to receive the corresponding remuneration for the time
+            spent up to that point, provided that this can be clearly demonstrated (see section
+            Voluntary participation).
+          </p>
+          <p>
+            <strong>Voluntary participation:</strong> <br />
+            Your participation in this research project is voluntary. You can withdraw your consent
+            to participate at any time and without giving reasons, without receiving any
+            disadvantages. Even if you decide to withdraw from the study, you are still entitled to
+            receive the corresponding remuneration for the time spent up to that point, provided
+            that this can be clearly demonstrated.
+          </p>
+          <p>
+            <strong>Participation requirements:</strong> <br />
+            The only participation requirement is a minimum age of 18 years. Those who have already
+            participated in this study are excluded from participation.
+          </p>
+          <p>
+            <strong>Data protection and anonymity:</strong> <br />
+            Apart from gender and education status, no personal data are collected as part of this
+            study. It is therefore not possible for us to personally identify you. As a user of
+            Prolific, you have entered into a separate{' '}
+            <a target='_blank' href='https://participant-help.prolific.com/en/article/498241'>
+              personal data processing agreement with Prolific
+            </a>
+            . This agreement is independent of your consent related to this study and the personal
+            data collected by Prolific will not be made available to the research team of this study
+            at any point.
+          </p>
+          <p>
+            <strong>Use of data:</strong> <br />
+            The results of this study may be published for teaching and research purposes (e.g.
+            theses, scientific publications or conference papers). These results will be presented
+            in anonymized form, i.e. without the data being able to be connected to a specific
+            person. The fully anonymized data of this study will be made available as "open data" in
+            an internet-based repository, if applicable. Thus, this study follows the
+            recommendations of the German Research Foundation (DFG) for quality assurance with
+            regard to verifiability and reproducibility of scientific results, as well as optimal
+            data re-use. If you would like to receive information on the scientific results of the
+            study after its completion, please send an e-mail to Elisabeth Kraus
+            (e.kraus@psy.lmu.de).
+          </p>
+          <p>
+            <strong>Legal basis and revocation:</strong> <br />
+            The legal basis for processing the aforementioned personal data is the consent pursuant
+            to Art. 6 (1) letter a EU-DSGVO at the end of this document. You have the right to
+            revoke the data protection consent at any time. The revocation does not affect the
+            lawfulness of the processing carried out on the basis of the consent until the
+            revocation. You can request an obligatory deletion of your data at any time - as long as
+            you can provide sufficient information that allows us to identify your data. To do so,
+            please contact the research project managers. You will not suffer any disadvantages as a
+            result of the revocation.
+          </p>
+          <p>
+            <strong>Research project managers:</strong> <br />
+            If you have any questions about the research project or if you want to exercise your
+            right to withdraw your consent, please contact the research project managers:
+          </p>
+          <p>
+            Dr. Elisabeth Kraus <br />
+            Prof. Dr. Christopher Donkin
+            <br />
+          </p>
+          <p>
+            Ludwig-Maximilians-Universität München
+            <br />
+            Department Psychologie
+            <br />
+            Lehrstuhl für Computational Modeling in Psychology
+            <br />
+            Akademiestr. 7<br />
+            80799 München
+            <br />
+          </p>
+          <p>
+            e.kraus@psy.lmu.de
+            <br />
+            c.donkin@psy.lmu.de
+          </p>
+          <p>
+            <strong>Further contact addresses:</strong> <br />
+            You can also contact the data protection officer of the research institution or the
+            competent supervisory authority if you have any data protection concerns in connection
+            with this study and/or wish to lodge a complaint.
+          </p>
+          <p>
+            {' '}
+            <br />
+            Ludwig-Maximilians-Universität München <br />
+            Behördlicher Datenschutzbeauftragter <br />
+            Geschwister-Scholl-Platz 1 <br />
+            D-80539 München <br />
+            Bayerisches Landesamt für Datenschutzaufsicht <br />
+            Promenade 27 <br />
+            91522 Ansbach <br />
+            <br />
+            <br />
+            Date: December 02, 2024
+            <br />
+            <br />
+            <strong>Declaration of consent.</strong> I hereby certify that I have read and
+            understood the participant information described above and that I agree to the
+            conditions stated. I agree in accordance with Art. 6 (1) letter a EU-DSGVO. I have been
+            informed about my right to revoke my data protection consent.
+            <br />
+            <br />
+            <strong>Declaration of fulfillment inclusion criteria.</strong> I hereby confirm that I
+            meet the above conditions for participation (18+ years old, first-time participation).
+          </p>
+        </div>
+      ),
+    },
+  },
+  {
+    name: `survey`,
+    type: 'Quest',
+    props: {
+      surveyJson: {
+        pages: [
+          {
+            elements: [
+              {
+                type: 'radiogroup',
+                name: 'dem_gender',
+                title: 'What gender do you identify with?',
+                isRequired: true,
+                colCount: 1,
+                choices: ['male', 'female', 'other'],
+              },
+              {
+                type: 'radiogroup',
+                name: 'dem_utility',
+                title: 'How much do you know about utility theory?',
+                isRequired: true,
+                colCount: 1,
+                choices: ['nothing', 'a little', 'a lot'],
+              },
+            ],
+          },
+        ],
+      },
+    },
+  },
+  {
     name: 'introtext',
     type: 'Text',
     props: {
@@ -420,31 +587,6 @@ const experiment = [
           the experiment, so there are no consequences for your selections. <br />
         </>
       ),
-    },
-  },
-  {
-    name: `survey`,
-    type: 'Quest',
-    props: {
-      surveyJson: {
-        pages: [
-          {
-            elements: [
-              {
-                type: 'rating',
-                name: 'sad',
-                title:
-                  'Demographic questions could be here. How sad are you that they are missing?',
-                isRequired: true,
-                rateMin: 1,
-                rateMax: 6,
-                minRateDescription: 'Not at all',
-                maxRateDescription: 'Extremely',
-              },
-            ],
-          },
-        ],
-      },
     },
   },
   {
