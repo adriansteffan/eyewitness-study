@@ -657,7 +657,7 @@ const processJsonToCSVs = (sessionID: number, data: any[]): FileUpload[] => {
     {
       filename: `${sessionID}_survey.csv`,
       encoding: 'utf8',
-      content: ['sessionID,measure,name', ...csvRowsSurvey].join('\n'),
+      content: ['sessionID,measure,value', ...csvRowsSurvey].join('\n'),
     },
   ];
 };
