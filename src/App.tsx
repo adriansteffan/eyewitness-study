@@ -139,7 +139,7 @@ const stimuli = shuffle(
   (await loadAllStimuli())
     .slice(0, getParam('nitems', undefined, 'number'))
     .map((stimulus) => [
-      //({ ...stimulus, type: 'rank' },
+      { ...stimulus, type: 'rank' },
       { ...stimulus, type: 'dnd' },
     ])
     .flat(),
@@ -186,9 +186,7 @@ export function SortableItem(props: { id: any; data: OptionData }) {
   );
 }
 
-
-
-const DNDTable = ({ data }: { data: OptionData[] }) => {
+const DNDTable = ({ data, next }: { data: OptionData[]; next: (data: OptionData[]) => void }) => {
   const [items, setItems] = useState(data.map((item) => item.option));
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -199,9 +197,50 @@ const DNDTable = ({ data }: { data: OptionData[] }) => {
       activationConstraint: {
         delay: 100,
         tolerance: 5,
-      }
+      },
     }),
   );
+
+  const [hasDragged, setHasDragged] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+
+  function handleDragStart() {
+    if (!hasDragged) {
+      setHasDragged(true);
+    }
+  }
+
+  const startedTimestampRef = useRef(now());
+
+  const handleConfirm = () => {
+    if (!hasDragged) {
+      // Show confirmation dialog if user hasn't dragged anything
+      setShowConfirmation(true);
+      return;
+    }
+
+    // Process and continue if user has already dragged
+    submitData();
+  };
+
+  const submitData = () => {
+    // global duration, since item level duration does not make sense for the dnd ordering task
+    const duration = now() - startedTimestampRef.current;
+
+    const updatedData = [...data];
+
+    items.forEach((itemOption, index) => {
+      const dataIndex = updatedData.findIndex((item) => item.option === itemOption);
+      if (dataIndex !== -1) {
+        updatedData[dataIndex].picked.push({
+          num: index + 1,
+          time: duration,
+        });
+      }
+    });
+
+    next(updatedData);
+  };
 
   function handleDragEnd(event: { active: any; over: any }) {
     const { active, over } = event;
@@ -217,16 +256,15 @@ const DNDTable = ({ data }: { data: OptionData[] }) => {
   }
 
   // Width for the arrow column for consistency consistent
-  const arrowWidth = "w-16"; 
+  const arrowWidth = 'w-16';
 
   return (
     <>
-      <div className="flex flex-col">
+      <div className='flex flex-col'>
         <div className={`flex flex-row items-start`}>
           <div className={`${arrowWidth}`}></div>
-          <div className="w-full">
+          <div className='w-full'>
             <div className='border-4 border-t-4 border-l-4 border-r-4 border-b-0 border-black bg-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]'>
-            
               <div className='flex w-full bg-black text-white text-base sm:text-xl'>
                 <div className='p-4 text-left border-r-4 border-black font-mono flex-1'>
                   Eyewitness <span className='text-base'>#</span>
@@ -239,24 +277,25 @@ const DNDTable = ({ data }: { data: OptionData[] }) => {
             </div>
           </div>
         </div>
-        
-        <div className="flex flex-row">
+
+        <div className='flex flex-row'>
           <div className={`flex flex-col py-5 items-center justify-between ${arrowWidth}`}>
-            <div className="text-sm font-bold mb-1">most</div>
-            <svg viewBox="0 0 30 100" className="w-8 h-full">
-              <line x1="15" y1="10" x2="15" y2="90" stroke="black" strokeWidth="2" />
-              <line x1="15" y1="10" x2="8" y2="20" stroke="black" strokeWidth="2" />
-              <line x1="15" y1="10" x2="22" y2="20" stroke="black" strokeWidth="2" />
-              <line x1="15" y1="90" x2="8" y2="80" stroke="black" strokeWidth="2" />
-              <line x1="15" y1="90" x2="22" y2="80" stroke="black" strokeWidth="2" />
+            <div className='text-sm font-bold mb-1'>most</div>
+            <svg viewBox='0 0 30 100' className='w-8 h-full'>
+              <line x1='15' y1='10' x2='15' y2='90' stroke='black' strokeWidth='2' />
+              <line x1='15' y1='10' x2='8' y2='20' stroke='black' strokeWidth='2' />
+              <line x1='15' y1='10' x2='22' y2='20' stroke='black' strokeWidth='2' />
+              <line x1='15' y1='90' x2='8' y2='80' stroke='black' strokeWidth='2' />
+              <line x1='15' y1='90' x2='22' y2='80' stroke='black' strokeWidth='2' />
             </svg>
-            <div className="text-sm font-bold mt-1">least</div>
+            <div className='text-sm font-bold mt-1'>least</div>
           </div>
-          
+
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
             onDragEnd={handleDragEnd}
+            onDragStart={handleDragStart}
             modifiers={[restrictToParentElement, restrictToVerticalAxis]}
           >
             <div className='w-full border-4 border-t-0 border-black bg-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]'>
@@ -273,7 +312,7 @@ const DNDTable = ({ data }: { data: OptionData[] }) => {
           </DndContext>
         </div>
       </div>
-      
+
       <p className='text-base sm:text-xl mt-6'>
         Please sort the suspects according to whom you consider likely to have committed the crime
         (Most likely at the top and least likely at the bottom).
@@ -281,10 +320,39 @@ const DNDTable = ({ data }: { data: OptionData[] }) => {
 
       <button
         className='cursor-pointer mx-auto w-36 bg-white px-8 py-3 border-2 border-black font-bold text-black text-lg rounded-full shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-x-[4px] hover:translate-y-[4px] hover:shadow-none mt-6'
-        onClick={() => {}}
+        onClick={handleConfirm}
       >
         Confirm
       </button>
+
+      {showConfirmation && (
+        <div className='fixed inset-0 bg-black/50 flex items-center justify-center z-50'>
+          <div className='bg-white p-6 rounded-lg border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] max-w-md w-full'>
+            <h3 className='text-xl font-bold mb-4'>Confirm</h3>
+            <p className='mb-6'>
+              You haven't changed the order of the suspects. Are you sure you want to continue with
+              the current order?
+            </p>
+            <div className='flex justify-end space-x-4'>
+              <button
+                onClick={() => setShowConfirmation(false)}
+                className='px-4 py-2 border-2 border-black rounded-full hover:bg-gray-100'
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowConfirmation(false);
+                  submitData();
+                }}
+                className='px-4 py-2 bg-black text-white border-2 border-black rounded-full hover:bg-gray-800'
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
@@ -320,6 +388,15 @@ const EyewitnessBlock = ({
             option: newData,
           },
         ]);
+        console.log([
+          ...data,
+          {
+            version: stimulus.type,
+            category: stimulus.category,
+            stimulusIdWithinCategory: stimulus.stimulusIDwithinCategory,
+            option: newData,
+          },
+        ]);
         setStimulusCounter(stimulusCounter + 1);
       }}
       confirmNeeded={false}
@@ -346,6 +423,11 @@ const EyewitnessTable = ({
     stimulus.map((s: Option) => ({ ...s, picked: [] })),
   );
   const [nSelection, setNSelection] = useState(1);
+
+  const handleDndData = (updatedData: OptionData[]) => {
+    setData(updatedData);
+    next(updatedData);
+  };
 
   useEffect(() => {
     if (nSelection > data.length) {
@@ -473,7 +555,7 @@ const EyewitnessTable = ({
               </table>
             )}
 
-            {version === 'dnd' && <DNDTable data={data} />}
+            {version === 'dnd' && <DNDTable data={data} next={handleDndData} />}
 
             <p className='text-base sm:text-xl'>
               {version === 'rank' && (
@@ -560,207 +642,218 @@ const processJsonToCSVs = (sessionID: number, data: any[]): FileUpload[] => {
       .join(','),
   );
 
+  const survey = data.find((item) => item.name === 'survey').data;
+
+  const csvRowsSurvey = survey.map((surveyItem: {name: string, value: string}) =>
+    `${sessionID},${surveyItem.name},${surveyItem.value}`
+  );
+
   return [
     {
       filename: `${sessionID}_trialdata.csv`,
       encoding: 'utf8',
       content: [headers, ...csvRows].join('\n'),
     },
+    {
+      filename: `${sessionID}_survey.csv`,
+      encoding: 'utf8',
+      content: ['sessionID,measure,name', ...csvRowsSurvey].join('\n'),
+    },
   ];
 };
 
 const experiment = [
-  // {
-  //   name: 'consenttext',
-  //   type: 'Text',
-  //   props: {
-  //     buttonText: 'Accept',
-  //     animate: true,
+  {
+    name: 'consenttext',
+    type: 'Text',
+    props: {
+      buttonText: 'Accept',
+      animate: true,
 
-  //     content: (
-  //       <div>
-  //         <h1>Participant Information</h1>
-  //         <p>
-  //           Thank you for your interest in our research project. Enclosed you will find information
-  //           about the research project, the conditions of participation and the handling of the
-  //           collected data. Please read everything carefully. If you agree and want to participate
-  //           in the experiment, please confirm by giving your consent below.
-  //         </p>
-  //         <p>
-  //           <strong>General information about the research project:</strong> <br />
-  //           This study investigates how people make decisions in a multi-attribute situation. The
-  //           study takes about 30 minutes in total and includes tasks in which you are asked to
-  //           estimate the likelihood of fictive subjects having committed fictive crimes, based on
-  //           fictive eye-witness statements. No special stress or harm is expected as a result of
-  //           participating in this research project. Participation in the study is remunerated at 10€
-  //           per hour, rounded up to the nearest minute. Even if you decide to withdraw from the
-  //           study, you are still entitled to receive the corresponding remuneration for the time
-  //           spent up to that point, provided that this can be clearly demonstrated (see section
-  //           Voluntary participation).
-  //         </p>
-  //         <p>
-  //           <strong>Voluntary participation:</strong> <br />
-  //           Your participation in this research project is voluntary. You can withdraw your consent
-  //           to participate at any time and without giving reasons, without receiving any
-  //           disadvantages. Even if you decide to withdraw from the study, you are still entitled to
-  //           receive the corresponding remuneration for the time spent up to that point, provided
-  //           that this can be clearly demonstrated.
-  //         </p>
-  //         <p>
-  //           <strong>Participation requirements:</strong> <br />
-  //           The only participation requirement is a minimum age of 18 years. Those who have already
-  //           participated in this study are excluded from participation.
-  //         </p>
-  //         <p>
-  //           <strong>Data protection and anonymity:</strong> <br />
-  //           Apart from gender and education status, no personal data are collected as part of this
-  //           study. It is therefore not possible for us to personally identify you. As a user of
-  //           Prolific, you have entered into a separate{' '}
-  //           <a target='_blank' href='https://participant-help.prolific.com/en/article/498241'>
-  //             personal data processing agreement with Prolific
-  //           </a>
-  //           . This agreement is independent of your consent related to this study and the personal
-  //           data collected by Prolific will not be made available to the research team of this study
-  //           at any point.
-  //         </p>
-  //         <p>
-  //           <strong>Use of data:</strong> <br />
-  //           The results of this study may be published for teaching and research purposes (e.g.
-  //           theses, scientific publications or conference papers). These results will be presented
-  //           in anonymized form, i.e. without the data being able to be connected to a specific
-  //           person. The fully anonymized data of this study will be made available as "open data" in
-  //           an internet-based repository, if applicable. Thus, this study follows the
-  //           recommendations of the German Research Foundation (DFG) for quality assurance with
-  //           regard to verifiability and reproducibility of scientific results, as well as optimal
-  //           data re-use. If you would like to receive information on the scientific results of the
-  //           study after its completion, please send an e-mail to Elisabeth Kraus
-  //           (e.kraus@psy.lmu.de).
-  //         </p>
-  //         <p>
-  //           <strong>Legal basis and revocation:</strong> <br />
-  //           The legal basis for processing the aforementioned personal data is the consent pursuant
-  //           to Art. 6 (1) letter a EU-DSGVO at the end of this document. You have the right to
-  //           revoke the data protection consent at any time. The revocation does not affect the
-  //           lawfulness of the processing carried out on the basis of the consent until the
-  //           revocation. You can request an obligatory deletion of your data at any time - as long as
-  //           you can provide sufficient information that allows us to identify your data. To do so,
-  //           please contact the research project managers. You will not suffer any disadvantages as a
-  //           result of the revocation.
-  //         </p>
-  //         <p>
-  //           <strong>Research project managers:</strong> <br />
-  //           If you have any questions about the research project or if you want to exercise your
-  //           right to withdraw your consent, please contact the research project managers:
-  //         </p>
-  //         <p>
-  //           Dr. Elisabeth Kraus <br />
-  //           Prof. Dr. Christopher Donkin
-  //           <br />
-  //         </p>
-  //         <p>
-  //           Ludwig-Maximilians-Universität München
-  //           <br />
-  //           Department Psychologie
-  //           <br />
-  //           Lehrstuhl für Computational Modeling in Psychology
-  //           <br />
-  //           Akademiestr. 7<br />
-  //           80799 München
-  //           <br />
-  //         </p>
-  //         <p>
-  //           e.kraus@psy.lmu.de
-  //           <br />
-  //           c.donkin@psy.lmu.de
-  //         </p>
-  //         <p>
-  //           <strong>Further contact addresses:</strong> <br />
-  //           You can also contact the data protection officer of the research institution or the
-  //           competent supervisory authority if you have any data protection concerns in connection
-  //           with this study and/or wish to lodge a complaint.
-  //         </p>
-  //         <p>
-  //           {' '}
-  //           <br />
-  //           Ludwig-Maximilians-Universität München <br />
-  //           Behördlicher Datenschutzbeauftragter <br />
-  //           Geschwister-Scholl-Platz 1 <br />
-  //           D-80539 München <br />
-  //           Bayerisches Landesamt für Datenschutzaufsicht <br />
-  //           Promenade 27 <br />
-  //           91522 Ansbach <br />
-  //           <br />
-  //           <br />
-  //           Date: December 02, 2024
-  //           <br />
-  //           <br />
-  //           <strong>Declaration of consent.</strong> I hereby certify that I have read and
-  //           understood the participant information described above and that I agree to the
-  //           conditions stated. I agree in accordance with Art. 6 (1) letter a EU-DSGVO. I have been
-  //           informed about my right to revoke my data protection consent.
-  //           <br />
-  //           <br />
-  //           <strong>Declaration of fulfillment inclusion criteria.</strong> I hereby confirm that I
-  //           meet the above conditions for participation (18+ years old, first-time participation).
-  //         </p>
-  //       </div>
-  //     ),
-  //   },
-  // },
-  // {
-  //   name: `survey`,
-  //   type: 'Quest',
-  //   props: {
-  //     surveyJson: {
-  //       pages: [
-  //         {
-  //           elements: [
-  //             {
-  //               type: 'radiogroup',
-  //               name: 'dem_gender',
-  //               title: 'What gender do you identify with?',
-  //               isRequired: true,
-  //               colCount: 1,
-  //               choices: ['male', 'female', 'other'],
-  //             },
-  //             {
-  //               type: 'radiogroup',
-  //               name: 'dem_utility',
-  //               title: 'How much do you know about utility theory?',
-  //               isRequired: true,
-  //               colCount: 1,
-  //               choices: ['nothing', 'a little', 'a lot'],
-  //             },
-  //           ],
-  //         },
-  //       ],
-  //     },
-  //   },
-  // },
-  // {
-  //   name: 'introtext',
-  //   type: 'Text',
-  //   props: {
-  //     buttonText: "Let's Begin",
-  //     animate: true,
-  //     content: (
-  //       <>
-  //         <h1 className='text-4xl'>
-  //           <strong>Instructions </strong>
-  //         </h1>
-  //         <br />
-  //         You will see several suspects of a crime on each trial. You will be asked to either select
-  //         the suspect who seems most likely to have committed the crime, or to rank the suspects
-  //         according to their likelihood of having committed the crime, on the basis of the strengths
-  //         of two eyewitness testimonies. The strengths of the eyewitness testimonies are presented
-  //         on a 0–10 scale, with 0 implying very weak evidence of guilt and 10 implying very strong
-  //         evidence of guilt. The testimonies of both eyewitnesses are equally valid and important,
-  //         and the strengths of the testimonies are equated. You will not receive any feedback during
-  //         the experiment, so there are no consequences for your selections. <br />
-  //       </>
-  //     ),
-  //   },
-  // },
+      content: (
+        <div>
+          <h1>Participant Information</h1>
+          <p>
+            Thank you for your interest in our research project. Enclosed you will find information
+            about the research project, the conditions of participation and the handling of the
+            collected data. Please read everything carefully. If you agree and want to participate
+            in the experiment, please confirm by giving your consent below.
+          </p>
+          <p>
+            <strong>General information about the research project:</strong> <br />
+            This study investigates how people make decisions in a multi-attribute situation. The
+            study takes about 30 minutes in total and includes tasks in which you are asked to
+            estimate the likelihood of fictive subjects having committed fictive crimes, based on
+            fictive eye-witness statements. No special stress or harm is expected as a result of
+            participating in this research project. Participation in the study is remunerated at 10€
+            per hour, rounded up to the nearest minute. Even if you decide to withdraw from the
+            study, you are still entitled to receive the corresponding remuneration for the time
+            spent up to that point, provided that this can be clearly demonstrated (see section
+            Voluntary participation).
+          </p>
+          <p>
+            <strong>Voluntary participation:</strong> <br />
+            Your participation in this research project is voluntary. You can withdraw your consent
+            to participate at any time and without giving reasons, without receiving any
+            disadvantages. Even if you decide to withdraw from the study, you are still entitled to
+            receive the corresponding remuneration for the time spent up to that point, provided
+            that this can be clearly demonstrated.
+          </p>
+          <p>
+            <strong>Participation requirements:</strong> <br />
+            The only participation requirement is a minimum age of 18 years. Those who have already
+            participated in this study are excluded from participation.
+          </p>
+          <p>
+            <strong>Data protection and anonymity:</strong> <br />
+            Apart from gender and education status, no personal data are collected as part of this
+            study. It is therefore not possible for us to personally identify you. As a user of
+            Prolific, you have entered into a separate{' '}
+            <a target='_blank' href='https://participant-help.prolific.com/en/article/498241'>
+              personal data processing agreement with Prolific
+            </a>
+            . This agreement is independent of your consent related to this study and the personal
+            data collected by Prolific will not be made available to the research team of this study
+            at any point.
+          </p>
+          <p>
+            <strong>Use of data:</strong> <br />
+            The results of this study may be published for teaching and research purposes (e.g.
+            theses, scientific publications or conference papers). These results will be presented
+            in anonymized form, i.e. without the data being able to be connected to a specific
+            person. The fully anonymized data of this study will be made available as "open data" in
+            an internet-based repository, if applicable. Thus, this study follows the
+            recommendations of the German Research Foundation (DFG) for quality assurance with
+            regard to verifiability and reproducibility of scientific results, as well as optimal
+            data re-use. If you would like to receive information on the scientific results of the
+            study after its completion, please send an e-mail to Elisabeth Kraus
+            (e.kraus@psy.lmu.de).
+          </p>
+          <p>
+            <strong>Legal basis and revocation:</strong> <br />
+            The legal basis for processing the aforementioned personal data is the consent pursuant
+            to Art. 6 (1) letter a EU-DSGVO at the end of this document. You have the right to
+            revoke the data protection consent at any time. The revocation does not affect the
+            lawfulness of the processing carried out on the basis of the consent until the
+            revocation. You can request an obligatory deletion of your data at any time - as long as
+            you can provide sufficient information that allows us to identify your data. To do so,
+            please contact the research project managers. You will not suffer any disadvantages as a
+            result of the revocation.
+          </p>
+          <p>
+            <strong>Research project managers:</strong> <br />
+            If you have any questions about the research project or if you want to exercise your
+            right to withdraw your consent, please contact the research project managers:
+          </p>
+          <p>
+            Dr. Elisabeth Kraus <br />
+            Prof. Dr. Christopher Donkin
+            <br />
+          </p>
+          <p>
+            Ludwig-Maximilians-Universität München
+            <br />
+            Department Psychologie
+            <br />
+            Lehrstuhl für Computational Modeling in Psychology
+            <br />
+            Akademiestr. 7<br />
+            80799 München
+            <br />
+          </p>
+          <p>
+            e.kraus@psy.lmu.de
+            <br />
+            c.donkin@psy.lmu.de
+          </p>
+          <p>
+            <strong>Further contact addresses:</strong> <br />
+            You can also contact the data protection officer of the research institution or the
+            competent supervisory authority if you have any data protection concerns in connection
+            with this study and/or wish to lodge a complaint.
+          </p>
+          <p>
+            {' '}
+            <br />
+            Ludwig-Maximilians-Universität München <br />
+            Behördlicher Datenschutzbeauftragter <br />
+            Geschwister-Scholl-Platz 1 <br />
+            D-80539 München <br />
+            Bayerisches Landesamt für Datenschutzaufsicht <br />
+            Promenade 27 <br />
+            91522 Ansbach <br />
+            <br />
+            <br />
+            Date: December 02, 2024
+            <br />
+            <br />
+            <strong>Declaration of consent.</strong> I hereby certify that I have read and
+            understood the participant information described above and that I agree to the
+            conditions stated. I agree in accordance with Art. 6 (1) letter a EU-DSGVO. I have been
+            informed about my right to revoke my data protection consent.
+            <br />
+            <br />
+            <strong>Declaration of fulfillment inclusion criteria.</strong> I hereby confirm that I
+            meet the above conditions for participation (18+ years old, first-time participation).
+          </p>
+        </div>
+      ),
+    },
+  },
+  {
+    name: `survey`,
+    type: 'Quest',
+    props: {
+      surveyJson: {
+        pages: [
+          {
+            elements: [
+              {
+                type: 'radiogroup',
+                name: 'dem_gender',
+                title: 'What gender do you identify with?',
+                isRequired: true,
+                colCount: 1,
+                choices: ['male', 'female', 'other'],
+              },
+              {
+                type: 'radiogroup',
+                name: 'dem_utility',
+                title: 'How much do you know about utility theory?',
+                isRequired: true,
+                colCount: 1,
+                choices: ['nothing', 'a little', 'a lot'],
+              },
+            ],
+          },
+        ],
+      },
+    },
+  },
+  {
+    name: 'introtext',
+    type: 'Text',
+    props: {
+      buttonText: "Let's Begin",
+      animate: true,
+      content: (
+        <>
+          <h1 className='text-4xl'>
+            <strong>Instructions </strong>
+          </h1>
+          <br />
+          You will see several suspects of a crime on each trial. You will be asked to either select
+          the suspect who seems most likely to have committed the crime, or to rank the suspects
+          according to their likelihood of having committed the crime, on the basis of the strengths
+          of two eyewitness testimonies. The strengths of the eyewitness testimonies are presented
+          on a 0–10 scale, with 0 implying very weak evidence of guilt and 10 implying very strong
+          evidence of guilt. The testimonies of both eyewitnesses are equally valid and important,
+          and the strengths of the testimonies are equated. You will not receive any feedback during
+          the experiment, so there are no consequences for your selections. <br />
+        </>
+      ),
+    },
+  },
   {
     name: 'eyewitnesstrial',
     type: 'EyewitnessBlock',
