@@ -14,6 +14,7 @@
     "rp-dev-pull": "npm link @adriansteffan/reactive"
   },
   "dependencies": {
+    "@adriansteffan/reactive": "0.0.17",
     "@tanstack/react-query": "^5.61.3",
     "@tanstack/react-query-devtools": "^5.61.3",
     "react": "^18.2.0",
@@ -40,9 +41,9 @@
     "prettier": "3.2.5",
     "tailwindcss": "^4.0.9",
     "typescript": "^5.2.2",
-    "vite": "^5.2.0",
+    "vite": "^6.2.0",
     "vite-plugin-dts": "^4.3.0",
     "vite-plugin-top-level-await": "^1.4.4",
-    "vitest": "^2.1.5"
+    "vitest": "^3.0.7"
   }
 }
