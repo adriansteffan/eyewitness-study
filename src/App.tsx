@@ -11,6 +11,27 @@ import {
   ProlificEnding,
 } from '@adriansteffan/reactive';
 
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  TouchSensor,
+} from '@dnd-kit/core';
+import {
+  useSortable,
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+
+import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifiers';
+
+import { CSS } from '@dnd-kit/utilities';
+
 interface CSVRow {
   stimulus: number;
   option: number;
@@ -20,7 +41,7 @@ interface CSVRow {
   [key: string]: string | number;
 }
 
-type TrialType = 'rank' | 'consec';
+type TrialType = 'rank' | 'dnd' | 'consec';
 
 function parseCSV(csvString: string): CSVRow[] {
   const lines: string[] = csvString.trim().split('\n');
@@ -118,13 +139,155 @@ const stimuli = shuffle(
   (await loadAllStimuli())
     .slice(0, getParam('nitems', undefined, 'number'))
     .map((stimulus) => [
-      { ...stimulus, type: 'rank' },
-      { ...stimulus, type: 'consec' },
+      //({ ...stimulus, type: 'rank' },
+      { ...stimulus, type: 'dnd' },
     ])
     .flat(),
 );
 
 const config: ExperimentConfig = { showProgressBar: false };
+
+export function SortableItem(props: { id: any; data: OptionData }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: props.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    position: isDragging ? ('relative' as const) : ('inherit' as const),
+    zIndex: isDragging ? 1000 : 0,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex ${isDragging ? 'bg-yellow-300' : ''} w-full bg-white hover:bg-yellow-300 transition-colors touch-none`}
+      {...attributes}
+      {...listeners}
+    >
+      <div className='cursor-move p-4 border-r-4 border-b-2 border-t-2 border-l-2 border-black font-mono text-xl flex-1'>
+        {props.data.eyewitness1.toFixed(2)}
+      </div>
+      <div className='cursor-move p-4 border-r-4 border-b-2 border-t-2 border-black font-mono text-xl flex-1'>
+        {props.data.eyewitness2.toFixed(2)}
+      </div>
+      <div className='cursor-move p-4 border-r-2 border-b-2 border-t-2 border-black text-center w-16 flex justify-center items-center'>
+        <div className='cursor-move flex justify-center items-center'>
+          <div className='grid grid-cols-2 gap-1'>
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className='w-1 h-1 rounded-full bg-gray-900'></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+
+const DNDTable = ({ data }: { data: OptionData[] }) => {
+  const [items, setItems] = useState(data.map((item) => item.option));
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 100,
+        tolerance: 5,
+      }
+    }),
+  );
+
+  function handleDragEnd(event: { active: any; over: any }) {
+    const { active, over } = event;
+
+    if (active.id !== over.id) {
+      setItems((items) => {
+        const oldIndex = items.indexOf(active.id);
+        const newIndex = items.indexOf(over.id);
+
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  }
+
+  // Width for the arrow column for consistency consistent
+  const arrowWidth = "w-16"; 
+
+  return (
+    <>
+      <div className="flex flex-col">
+        <div className={`flex flex-row items-start`}>
+          <div className={`${arrowWidth}`}></div>
+          <div className="w-full">
+            <div className='border-4 border-t-4 border-l-4 border-r-4 border-b-0 border-black bg-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]'>
+            
+              <div className='flex w-full bg-black text-white text-base sm:text-xl'>
+                <div className='p-4 text-left border-r-4 border-black font-mono flex-1'>
+                  Eyewitness <span className='text-base'>#</span>
+                </div>
+                <div className='p-4 text-left border-r-4 border-black font-mono flex-1'>
+                  Eyewitness <span className='text-2xl'>&lowast;</span>
+                </div>
+                <div className='p-4 text-center w-16'></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex flex-row">
+          <div className={`flex flex-col py-5 items-center justify-between ${arrowWidth}`}>
+            <div className="text-sm font-bold mb-1">most</div>
+            <svg viewBox="0 0 30 100" className="w-8 h-full">
+              <line x1="15" y1="10" x2="15" y2="90" stroke="black" strokeWidth="2" />
+              <line x1="15" y1="10" x2="8" y2="20" stroke="black" strokeWidth="2" />
+              <line x1="15" y1="10" x2="22" y2="20" stroke="black" strokeWidth="2" />
+              <line x1="15" y1="90" x2="8" y2="80" stroke="black" strokeWidth="2" />
+              <line x1="15" y1="90" x2="22" y2="80" stroke="black" strokeWidth="2" />
+            </svg>
+            <div className="text-sm font-bold mt-1">least</div>
+          </div>
+          
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+            modifiers={[restrictToParentElement, restrictToVerticalAxis]}
+          >
+            <div className='w-full border-4 border-t-0 border-black bg-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]'>
+              <SortableContext items={items} strategy={verticalListSortingStrategy}>
+                <div className='w-full'>
+                  {items.map((id) => {
+                    const rowData = data.find((row) => row.option === id);
+                    if (!rowData) return null;
+                    return <SortableItem key={id} id={id} data={rowData} />;
+                  })}
+                </div>
+              </SortableContext>
+            </div>
+          </DndContext>
+        </div>
+      </div>
+      
+      <p className='text-base sm:text-xl mt-6'>
+        Please sort the suspects according to whom you consider likely to have committed the crime
+        (Most likely at the top and least likely at the bottom).
+      </p>
+
+      <button
+        className='cursor-pointer mx-auto w-36 bg-white px-8 py-3 border-2 border-black font-bold text-black text-lg rounded-full shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-x-[4px] hover:translate-y-[4px] hover:shadow-none mt-6'
+        onClick={() => {}}
+      >
+        Confirm
+      </button>
+    </>
+  );
+};
 
 const EyewitnessBlock = ({
   next,
@@ -244,68 +407,73 @@ const EyewitnessTable = ({
               Please rank the suspects according to the order of likelihood of having committed the
               crime, on the basis of the strengths of two eyewitness testimonies.
             </p>
-            <table className='w-full border-collapse bg-white border-4 border-black overflow-x-auto shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]'>
-              <thead>
-                <tr className='bg-black text-white text-base sm:text-xl'>
-                  <th className='p-4 text-left border-b-4 border-r-4 border-black font-mono '>
-                    Suspect
-                  </th>
-                  <th className='p-4 text-left border-b-4 border-r-4 border-black font-mono'>
-                    Eyewitness <span className='text-base'>#</span>
-                  </th>
-                  <th className='p-4 text-left border-b-4 border-black font-mono'>
-                    Eyewitness <span className='text-2xl '>&lowast;</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.map((row, index) => (
-                  <tr
-                    key={row.option}
-                    className={` ${
-                      selectedRow === row.option
-                        ? 'bg-yellow-300'
-                        : `bg-white ${confirmNeeded ? 'hover:bg-yellow-100' : 'hover:bg-yellow-300'} transition-colors`
-                    }`}
-                  >
-                    <td className='p-4 border-r-4 border-b-4 border-black'>
-                      <div className='relative inline-flex mt-1 items-center justify-center'>
-                        {(row.picked.length === 0 || version === 'rank') && (
-                          <button
-                            type='button'
-                            onClick={() => {
-                              if (!confirmNeeded) {
-                                handleChoice(index);
-                              } else {
-                                setSelectedRow(selectedRow === row.option ? null : row.option);
-                              }
-                            }}
-                            className={`w-6 h-6 border-4 border-black
-                          ${confirmNeeded ? ' rounded-full' : ''}
-                        ${selectedRow === row.option ? 'bg-yellow-300' : ''}`}
-                          >
-                            {selectedRow === row.option && (
-                              <div className='w-2 h-2 m-auto rounded-full bg-black' />
-                            )}
-                          </button>
-                        )}
-                        {row.picked.length !== 0 && <div className='w-6 h-6'></div>}
-                      </div>
-                    </td>
-                    <td className='p-4 border-r-4 border-b-4 border-black font-mono text-xl'>
-                      {(row.picked.length == 0 || version === 'rank') && (
-                        <>{row.eyewitness1.toFixed(2)}</>
-                      )}
-                    </td>
-                    <td className='p-4 border-b-4 border-black font-mono text-xl'>
-                      {(row.picked.length == 0 || version === 'rank') && (
-                        <>{row.eyewitness2.toFixed(2)}</>
-                      )}
-                    </td>
+
+            {version !== 'dnd' && (
+              <table className='w-full border-collapse bg-white border-4 border-black overflow-x-auto shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]'>
+                <thead>
+                  <tr className='bg-black text-white text-base sm:text-xl'>
+                    <th className='p-4 text-left border-b-4 border-r-4 border-black font-mono '>
+                      Suspect
+                    </th>
+                    <th className='p-4 text-left border-b-4 border-r-4 border-black font-mono'>
+                      Eyewitness <span className='text-base'>#</span>
+                    </th>
+                    <th className='p-4 text-left border-b-4 border-black font-mono'>
+                      Eyewitness <span className='text-2xl '>&lowast;</span>
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {data.map((row, index) => (
+                    <tr
+                      key={row.option}
+                      className={` ${
+                        selectedRow === row.option
+                          ? 'bg-yellow-300'
+                          : `bg-white ${confirmNeeded ? 'hover:bg-yellow-100' : 'hover:bg-yellow-300'} transition-colors`
+                      }`}
+                    >
+                      <td className='p-4 border-r-4 border-b-4 border-black'>
+                        <div className='relative inline-flex mt-1 items-center justify-center'>
+                          {(row.picked.length === 0 || version === 'rank') && (
+                            <button
+                              type='button'
+                              onClick={() => {
+                                if (!confirmNeeded) {
+                                  handleChoice(index);
+                                } else {
+                                  setSelectedRow(selectedRow === row.option ? null : row.option);
+                                }
+                              }}
+                              className={`w-6 h-6 border-4 border-black
+                            ${confirmNeeded ? ' rounded-full' : ''}
+                          ${selectedRow === row.option ? 'bg-yellow-300' : ''}`}
+                            >
+                              {selectedRow === row.option && (
+                                <div className='w-2 h-2 m-auto rounded-full bg-black' />
+                              )}
+                            </button>
+                          )}
+                          {row.picked.length !== 0 && <div className='w-6 h-6'></div>}
+                        </div>
+                      </td>
+                      <td className='p-4 border-r-4 border-b-4 border-black font-mono text-xl'>
+                        {(row.picked.length == 0 || version === 'rank') && (
+                          <>{row.eyewitness1.toFixed(2)}</>
+                        )}
+                      </td>
+                      <td className='p-4 border-b-4 border-black font-mono text-xl'>
+                        {(row.picked.length == 0 || version === 'rank') && (
+                          <>{row.eyewitness2.toFixed(2)}</>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+            {version === 'dnd' && <DNDTable data={data} />}
 
             <p className='text-base sm:text-xl'>
               {version === 'rank' && (
@@ -321,14 +489,17 @@ const EyewitnessTable = ({
                 </>
               )}
             </p>
-            <button
-              className={`${selectedRow === null ? 'invisible ' : ''} ${!confirmNeeded ? 'hidden ' : ''} mx-auto w-36 bg-white px-8 py-3 border-2 border-black font-bold text-black text-lg rounded-full shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-x-[4px] hover:translate-y-[4px] hover:shadow-none`}
-              onClick={() => {
-                handleChoice((selectedRow ?? 1) - 1);
-              }}
-            >
-              Confirm
-            </button>
+
+            {version !== 'dnd' && (
+              <button
+                className={`${selectedRow === null ? 'invisible ' : ''} ${!confirmNeeded ? 'hidden ' : ''} cursor-pointer mx-auto w-36 bg-white px-8 py-3 border-2 border-black font-bold text-black text-lg rounded-full shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-x-[4px] hover:translate-y-[4px] hover:shadow-none`}
+                onClick={() => {
+                  handleChoice((selectedRow ?? 1) - 1);
+                }}
+              >
+                Confirm
+              </button>
+            )}
           </>
         )}
       </div>
@@ -397,7 +568,6 @@ const processJsonToCSVs = (sessionID: number, data: any[]): FileUpload[] => {
     },
   ];
 };
-
 
 const experiment = [
   // {
@@ -537,78 +707,78 @@ const experiment = [
   //     ),
   //   },
   // },
-  {
-    name: `survey`,
-    type: 'Quest',
-    props: {
-      surveyJson: {
-        pages: [
-          {
-            elements: [
-              {
-                type: 'radiogroup',
-                name: 'dem_gender',
-                title: 'What gender do you identify with?',
-                isRequired: true,
-                colCount: 1,
-                choices: ['male', 'female', 'other'],
-              },
-              {
-                type: 'radiogroup',
-                name: 'dem_utility',
-                title: 'How much do you know about utility theory?',
-                isRequired: true,
-                colCount: 1,
-                choices: ['nothing', 'a little', 'a lot'],
-              },
-            ],
-          },
-        ],
-      },
-    },
-  },
-  {
-    name: 'introtext',
-    type: 'Text',
-    props: {
-      buttonText: "Let's Begin",
-      animate: true,
-      content: (
-        <>
-          <h1 className='text-4xl'>
-            <strong>Instructions </strong>
-          </h1>
-          <br />
-          You will see several suspects of a crime on each trial. You will be asked to either select
-          the suspect who seems most likely to have committed the crime, or to rank the suspects
-          according to their likelihood of having committed the crime, on the basis of the strengths
-          of two eyewitness testimonies. The strengths of the eyewitness testimonies are presented
-          on a 0–10 scale, with 0 implying very weak evidence of guilt and 10 implying very strong
-          evidence of guilt. The testimonies of both eyewitnesses are equally valid and important,
-          and the strengths of the testimonies are equated. You will not receive any feedback during
-          the experiment, so there are no consequences for your selections. <br />
-        </>
-      ),
-    },
-  },
   // {
-  //   name: 'eyewitnesstrial',
-  //   type: 'EyewitnessBlock',
+  //   name: `survey`,
+  //   type: 'Quest',
   //   props: {
-  //     stimuli: stimuli,
+  //     surveyJson: {
+  //       pages: [
+  //         {
+  //           elements: [
+  //             {
+  //               type: 'radiogroup',
+  //               name: 'dem_gender',
+  //               title: 'What gender do you identify with?',
+  //               isRequired: true,
+  //               colCount: 1,
+  //               choices: ['male', 'female', 'other'],
+  //             },
+  //             {
+  //               type: 'radiogroup',
+  //               name: 'dem_utility',
+  //               title: 'How much do you know about utility theory?',
+  //               isRequired: true,
+  //               colCount: 1,
+  //               choices: ['nothing', 'a little', 'a lot'],
+  //             },
+  //           ],
+  //         },
+  //       ],
+  //     },
   //   },
   // },
   // {
-  //   name: 'upload',
-  //   type: 'Upload',
+  //   name: 'introtext',
+  //   type: 'Text',
   //   props: {
-  //     generateFiles: processJsonToCSVs,
+  //     buttonText: "Let's Begin",
+  //     animate: true,
+  //     content: (
+  //       <>
+  //         <h1 className='text-4xl'>
+  //           <strong>Instructions </strong>
+  //         </h1>
+  //         <br />
+  //         You will see several suspects of a crime on each trial. You will be asked to either select
+  //         the suspect who seems most likely to have committed the crime, or to rank the suspects
+  //         according to their likelihood of having committed the crime, on the basis of the strengths
+  //         of two eyewitness testimonies. The strengths of the eyewitness testimonies are presented
+  //         on a 0–10 scale, with 0 implying very weak evidence of guilt and 10 implying very strong
+  //         evidence of guilt. The testimonies of both eyewitnesses are equally valid and important,
+  //         and the strengths of the testimonies are equated. You will not receive any feedback during
+  //         the experiment, so there are no consequences for your selections. <br />
+  //       </>
+  //     ),
   //   },
   // },
+  {
+    name: 'eyewitnesstrial',
+    type: 'EyewitnessBlock',
+    props: {
+      stimuli: stimuli,
+    },
+  },
+  {
+    name: 'upload',
+    type: 'Upload',
+    props: {
+      generateFiles: processJsonToCSVs,
+    },
+  },
   {
     name: 'thankyoutext',
     type: 'ProlificEnding',
-    props: {prolificCode: import.meta.env.VITE_PROLIFIC_CODE}
+    props: { prolificCode: import.meta.env.VITE_PROLIFIC_CODE },
   },
 ];
 
