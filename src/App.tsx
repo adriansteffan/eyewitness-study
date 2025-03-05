@@ -139,7 +139,7 @@ const stimuli = shuffle(
   (await loadAllStimuli())
     .slice(0, getParam('nitems', undefined, 'number'))
     .map((stimulus) => [
-      { ...stimulus, type: 'rank' },
+      { ...stimulus, type: 'consec' },
       { ...stimulus, type: 'dnd' },
     ])
     .flat(),
@@ -313,11 +313,6 @@ const DNDTable = ({ data, next }: { data: OptionData[]; next: (data: OptionData[
         </div>
       </div>
 
-      <p className='text-base sm:text-xl mt-6'>
-        Please sort the suspects according to whom you consider likely to have committed the crime
-        (Most likely at the top and least likely at the bottom).
-      </p>
-
       <button
         className='cursor-pointer mx-auto w-36 bg-white px-8 py-3 border-2 border-black font-bold text-black text-lg rounded-full shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-x-[4px] hover:translate-y-[4px] hover:shadow-none mt-6'
         onClick={handleConfirm}
@@ -485,10 +480,19 @@ const EyewitnessTable = ({
 
         {!isPauseScreen && (
           <>
-            <p className='text-base sm:text-xl'>
-              Please rank the suspects according to the order of likelihood of having committed the
-              crime, on the basis of the strengths of two eyewitness testimonies.
-            </p>
+            {version !== 'dnd' && (
+              <p className='text-base sm:text-xl'>
+                Please rank the suspects according to the order of likelihood of having committed
+                the crime, on the basis of the strengths of two eyewitness testimonies.
+              </p>
+            )}
+
+            {version === 'dnd' && (
+              <p className='text-base sm:text-xl mt-6'>
+                Please rank the suspects according to whom you consider likely to have committed the
+                crime (Most likely at the top and least likely at the bottom).
+              </p>
+            )}
 
             {version !== 'dnd' && (
               <table className='w-full border-collapse bg-white border-4 border-black overflow-x-auto shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]'>
@@ -644,8 +648,9 @@ const processJsonToCSVs = (sessionID: number, data: any[]): FileUpload[] => {
 
   const survey = data.find((item) => item.name === 'survey').data;
 
-  const csvRowsSurvey = survey.map((surveyItem: {name: string, value: string}) =>
-    `${sessionID},${surveyItem.name},${surveyItem.value}`
+  const csvRowsSurvey = survey.map(
+    (surveyItem: { name: string; value: string }) =>
+      `${sessionID},${surveyItem.name},${surveyItem.value}`,
   );
 
   return [
